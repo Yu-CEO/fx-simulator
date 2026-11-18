@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  index.html：為替の「動く幅」を学ぶシミュレーター（fx-simulator）の画面の骨組み
+  ・チャート・選択ボタン・帯の数字・答え合わせ・似た局面の表・注意書きの場所と、ファイルの読み込みだけを書く
+  ・動き（計算・表示）は js/ の各ファイル。入口は js/main.js
+  ・外部のフォント・ライブラリ・画像は読み込まない。インターネットにつながっていなくても、このファイルを直接開けば動く
+-->
+<title>為替の「動く幅」を学ぶ（米ドル／円）｜Yu</title>
+<meta name="description" content="米ドル／円の過去のデータから、為替がどれくらいの幅で動くものかを学ぶ無料ツール。売買のタイミングや方向を示すものではありません。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<nav class="bar" aria-label="サイトのメニュー">
+  <a class="bar-logo" href="https://yu-ceo.github.io/">Yu</a>
+  <a class="bar-link" href="https://yu-ceo.github.io/">Yuのページへ戻る</a>
+</nav>
+
+<header class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">無料・学ぶためのツール</p>
+    <h1>為替の「動く幅」を学ぶ</h1>
+    <p class="notice">このページは、為替がどのくらい動くかを学ぶためのものです。売買の判断には使えません。</p>
+    <p class="sub">米ドル／円・1日1つの値・過去約10年分</p>
+    <!-- 仕様 2-5 ページ上部の注意書き（文言は変えない） -->
+    <p class="lead">為替がどれくらいの幅で動くものかを、過去のデータで学ぶためのツールです。売買のタイミングや方向を示すものではありません。</p>
+  </div>
+</header>
+
+<!-- 先の長さ：下の 01〜03 すべてに効くので、画面の上に貼りつける -->
+<div class="horizon" id="horizon">
+  <div class="horizon-in">
+    <span class="horizon-label" id="h-label">先の長さ</span>
+    <div class="seg" role="group" aria-labelledby="h-label">
+      <button type="button" data-h="5" aria-pressed="false">1週間<small>5営業日</small></button>
+      <button type="button" data-h="10" aria-pressed="false">2週間<small>10営業日</small></button>
+      <button type="button" data-h="15" aria-pressed="false">3週間<small>15営業日</small></button>
+      <button type="button" data-h="20" aria-pressed="true">4週間<small>20営業日</small></button>
+    </div>
+  </div>
+</div>
+
+<main id="main">
+  <!-- 全体の読み込みに失敗したときだけ出す -->
+  <section class="card" id="fatal" hidden>
+    <div class="msg" role="alert">
+      データを読み込めませんでした。<br>時間をおいて、ページを開き直してください。<br>
+      <button type="button" class="btn-retry" data-act="reload">開き直す</button>
+    </div>
+  </section>
+
+  <!-- 01 動く幅（帯） -->
+  <section class="card" id="sec-band" aria-labelledby="h2-band">
+    <div class="card-head"><span class="step">01</span><h2 id="h2-band">この先の「動く幅」</h2></div>
+    <p class="what">黒い線が過去の値、右の青い帯が過去の動きの大きさから作った幅です。</p>
+    <div class="chart-top">
+      <span class="chart-title">米ドル／円 <span class="unit">（円）</span></span>
+      <div class="seg period" role="group" aria-label="チャートの期間">
+        <button type="button" data-p="250" aria-pressed="true">1年</button>
+        <button type="button" data-p="750" aria-pressed="false">3年</button>
+        <button type="button" data-p="2500" aria-pressed="false">10年</button>
+      </div>
+    </div>
+    <div class="chart" id="chart"></div>
+    <ul class="legend" aria-label="チャートの見方">
+      <li><span class="sw line"></span>過去の値</li>
+      <li><span class="sw narrow"></span>狭い帯</li>
+      <li><span class="sw wide"></span>広い帯</li>
+      <li><span class="sw dash"></span>データの最終日（ここから先は過去の動きから計算した幅）</li>
+    </ul>
+    <!-- この先の幅の拡大図（本体のチャートと縮尺が違うことを見出しで伝える） -->
+    <div class="zoom" id="zoom-box">
+      <p class="zoom-title">拡大図：時間の縮尺が上のチャートと違います</p>
+      <p class="zoom-sub">直近約3か月とこの先だけを、横に広げて表示しています。</p>
+      <div class="chart zoom-chart" id="chart-zoom"></div>
+    </div>
+    <div id="band-out"></div>
+    <!-- 仕様 2-2 帯のそばに常に出す文（文言は変えない。○○ は js/band_config.js の採用した方法の短い名前） -->
+    <p class="always">過去の動きの大きさ（計算方法：<span id="method-name">カルマンフィルタ</span>）から作った幅です。予測ではありません。<br><span class="tag">当サイトで計算</span></p>
+  </section>
+
+  <!-- 02 帯の答え合わせ -->
+  <section class="card" id="sec-bt" aria-labelledby="h2-bt">
+    <div class="card-head"><span class="step">02</span><h2 id="h2-bt">帯の答え合わせ</h2></div>
+    <p class="what">過去のそれぞれの日に、同じ作り方で帯を作っていたら、実際の値は帯の外に出たのか。</p>
+    <div id="bt-out"><div class="msg" role="status">読み込み中…</div></div>
+    <div id="cmp-out"></div>
+    <p class="always"><span class="tag">当サイトで計算</span></p>
+  </section>
+
+  <!-- 03 似た局面のその後（安全策：見出しに「過去の集計。この先を示すものではありません」） -->
+  <section class="card" id="sec-sim" aria-labelledby="h2-sim">
+    <div class="card-head"><span class="step">03</span>
+      <h2 id="h2-sim">似た局面のその後<span class="h2-sub">（過去の集計。この先を示すものではありません）</span></h2>
+    </div>
+    <div id="sim-out"><div class="msg" role="status">読み込み中…</div></div>
+    <!-- 仕様 2-4 表の下に常に出す文（文言は変えない） -->
+    <p class="always">過去の事実を数えただけです。重なった期間も別々に数えています。この先が同じになるとは限りません。<br><span class="tag">当サイトで計算</span></p>
+  </section>
+</main>
+
+<footer>
+  <!-- 仕様 2-5 ページ下部の注意書き（文言は変えない） -->
+  <h2>注意書き</h2>
+  <p>このツールは、過去の為替データを決まった計算式で集計・表示するだけのものです。将来の値動きを予測・保証するものではなく、特定の商品・取引・業者をすすめるものでもありません。FX（外国為替証拠金取引）は元本を超える損失が出ることがあります。実際の判断はご自身の責任で行ってください。</p>
+  <h2>データの出どころ</h2>
+  <p>為替データ：欧州中央銀行（ECB）の参照レート（<a href="https://frankfurter.dev/" target="_blank" rel="noopener noreferrer">Frankfurter</a> 経由で取得）</p>
+  <p>欧州中央銀行が1日1回公表する参照レートです。米ドル／円は、ユーロ基準の値から Frankfurter が計算し、当サイトで小数第3位に丸めたものです。リアルタイムの値ではありません。土日と欧州中央銀行の休業日の値はありません。データの正確さは保証されません。</p>
+  <p>帯・答え合わせ・似た局面の数字は、上のデータをもとに当サイトで計算したものです。</p>
+  <p><span class="last-date num" id="last-date">データの最終日：—</span></p>
+  <a class="back" href="https://yu-ceo.github.io/">Yuのページへ戻る</a>
+</footer>
+
+<!-- 最初に読むのはここまでの分（データは最近の分だけ）。採用した方法・過去の分などは js/data_loader.js が後から読む -->
+<script src="data/usdjpy_recent.js"></script>
+<script src="js/format.js"></script>
+<script src="js/band_config.js"></script>
+<script src="js/band_calc.js"></script>
+<script src="js/data_loader.js"></script>
+<script src="js/band_view.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

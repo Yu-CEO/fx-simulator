@@ -1,0 +1,16 @@
+.env
+*.log
+node_modules/
+.DS_Store
+Thumbs.db
+drafts/
+.confidential_words.txt
+.venv/
+__pycache__/
+
+# 開発中の仕様書・レビュー・QA報告（リポジトリには上げない）
+docs/
+
+# 1日1回だけ取得するための記録（Actions ではキャッシュで残す）
+.fetch_state/
+*.tmp

@@ -1,0 +1,70 @@
+# 為替データの自動取得：毎日 日本時間10:00（UTC 01:00）に tools/update_data.py を動かし、変化があれば commit・push する
+# ・取得は1日1回だけ。成功した日を .fetch_state/ に書き、Actions のキャッシュ（日付ごと）で残す。
+#   同じ日に手で再実行しても、キャッシュに今日の記録があれば API に問い合わせない
+# ・取得に失敗したら、ファイルを書き換えずにこの実行を「失敗」にする（画面は前日までのデータのまま）
+# ・GitHub Actions は混雑で数十分ほど遅れて動くことがある
+name: 為替データの自動取得
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # UTC 01:00 ＝ 日本時間 10:00
+  workflow_dispatch:
+
+permissions: {}
+
+# 同じ取得が2つ同時に動かないようにする
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write     # data/ の更新を commit・push する
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: 日本時間の今日の日付
+        id: today
+        run: echo "date=$(TZ=Asia/Tokyo date +%F)" >> "$GITHUB_OUTPUT"
+
+      # 1日1回だけにするための記録（今日の日付の名前で残す。成功した実行のあとにだけ保存される）
+      - uses: actions/cache@v4
+        with:
+          path: .fetch_state
+          key: fetch-state-${{ steps.today.outputs.date }}
+
+      - name: 取得して更新（標準ライブラリだけ）
+        run: python tools/update_data.py
+
+      # 全期間のデータで、画面の帯に使う「最終日の状態」を計算して usdjpy_recent.js の末尾に書く（採用した方法④のため）
+      - name: 帯の最終日の状態を作る
+        run: node tools/add_band_state.js
+
+      # 更新したデータで、テストと大きさの確認が通ることを確かめてから commit する
+      - name: テストと大きさの確認
+        run: |
+          node --test tests/
+          python -m unittest discover -s tests -p "test_*.py"
+          python tools/check_size.py
+
+      - name: 変化があれば commit・push
+        run: |
+          git config user.name "Yu-CEO"
+          git config user.email "356794411+Yu-CEO@users.noreply.github.com"
+          git add data/usdjpy_source.csv data/usdjpy_recent.js data/usdjpy_older.js
+          if git diff --cached --quiet; then
+            echo "データに変化はありません（commit しません）"
+          else
+            git commit -m "為替データを更新（${{ steps.today.outputs.date }}）"
+            git push
+          fi

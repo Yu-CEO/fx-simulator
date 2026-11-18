@@ -1,0 +1,83 @@
+# CI/CD（自動チェックと自動公開）の設定：fx-simulator（ブラウザで動くソフト＋Pythonの取得ツール）
+# GitHubにコードを上げるたびと、データの自動取得が終わったときに、次を自動で実行する。
+#   1. テスト（node --test と python unittest。本物の API には問い合わせない）
+#   2. 読む量の確認（tools/check_size.py。仕様 2-7 の上限を超えたら失敗）
+#   3. 機密チェック（ci/confidential_check.py）
+#   4. 1〜3が合格し、Web公開がオンのときだけ、GitHub Pages に公開する
+# データの自動取得（update_data.yml）が push したときは、GitHub の決まりでこの CI が動かないため、
+#   workflow_run（別の自動実行が終わったら動く仕組み）でつなぐ。
+# Web公開をオンにする方法：Settings → Secrets and variables → Actions → Variables に DEPLOY_PAGES = true（公開を決めてから）
+# 機密の言葉：Settings → Secrets and variables → Actions → Secrets に CONFIDENTIAL_WORDS（1行に1語）
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["為替データの自動取得"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  check:
+    # データの自動取得が失敗したときは、ここも動かさない
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: テスト
+        run: |
+          node --test tests/
+          python -m unittest discover -s tests -p "test_*.py"
+
+      - name: 読む量の確認
+        run: python tools/check_size.py
+
+      - name: 機密チェック
+        env:
+          CONFIDENTIAL_WORDS: ${{ secrets.CONFIDENTIAL_WORDS }}
+        run: python ci/confidential_check.py --require-words
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_PAGES == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # 公開するのは画面が読むファイルだけ（テスト・ツール・元の CSV・ドキュメントは公開しない）
+      - name: 公開するファイルをまとめる
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp -r css js _site/
+          cp data/*.js _site/data/
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
