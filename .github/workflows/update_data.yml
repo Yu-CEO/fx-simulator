@@ -3,6 +3,7 @@
 #   同じ日に手で再実行しても、キャッシュに今日の記録があれば API に問い合わせない
 # ・取得に失敗したら、ファイルを書き換えずにこの実行を「失敗」にする（画面は前日までのデータのまま）
 # ・GitHub Actions は混雑で数十分ほど遅れて動くことがある
+# ・取得が成功して、データの最終日が前回から変わった日だけ、縦動画づくり（make_video.yml）を呼ぶ（動画は成果物に保存するだけ。commit しない）
 name: 為替データの自動取得
 
 on:
@@ -22,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write     # data/ の更新を commit・push する
+    outputs:
+      make_video: ${{ steps.gate.outputs.make }}   # 縦動画を作るか（true/false）
     steps:
       - uses: actions/checkout@v5
 
@@ -42,6 +45,11 @@ jobs:
         with:
           path: .fetch_state
           key: fetch-state-${{ steps.today.outputs.date }}
+
+      # 取得の前のデータの最終日（取得のあとと比べて、変わった日だけ動画を作るため）
+      - name: 取得前のデータの最終日
+        id: before
+        run: echo "date=$(python tools/video/video_gate.py read data/usdjpy_recent.js)" >> "$GITHUB_OUTPUT"
 
       - name: 取得して更新（標準ライブラリだけ）
         run: python tools/update_data.py
@@ -68,3 +76,16 @@ jobs:
             git commit -m "為替データを更新（${{ steps.today.outputs.date }}）"
             git push
           fi
+
+      # ここまで成功（＝取得が成功して push まで済んだ）なら、最終日が変わったかを見て、動画を作るか決める
+      - name: 縦動画を作るか決める
+        id: gate
+        run: python tools/video/video_gate.py decide --before "${{ steps.before.outputs.date }}" --after-file data/usdjpy_recent.js >> "$GITHUB_OUTPUT"
+
+  # 縦動画（取得が失敗した日・最終日が変わらない日は動かない）
+  video:
+    needs: update
+    if: needs.update.outputs.make_video == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/make_video.yml

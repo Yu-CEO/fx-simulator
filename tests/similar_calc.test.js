@@ -83,8 +83,9 @@ test("AC-9：似た局面が30件未満なら表を出さず、件数つきの�
 });
 
 test("AC-9a：見出しに「過去の集計。この先を示すものではありません」がある", function () {
-  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.ok(html.includes("似た局面のその後<span class=\"h2-sub\">（過去の集計。この先を示すものではありません）</span>"));
+  const { buildSimilarDetailHtml } = require("../js/more_view.js");
+  const html = buildSimilarDetailHtml({ band: { enough: true }, laterStatus: "loading", horizon: 20 });
+  assert.ok(html.includes("似た局面のその後（過去の集計。この先を示すものではありません）"));
 });
 
 test("AC-9b・9c・9e：上下の行も2つの列も同じ見た目。矢印・記号・色の指定がなく、真ん中は件数・幅と同じ表にある", function () {

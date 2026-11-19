@@ -33,8 +33,8 @@ test("AC-7：帯の外に出る日が分かっているデータで、外に出�
   assert.ok(Math.abs(result.outsideWidePct - (2 / 30) * 100) < 1e-9);
   const container = fakeContainer();
   renderBacktest(container, result, "約1か月");
-  assert.ok(container.innerHTML.includes("過去 <b>30</b> 回のうち、約1か月後の値が狭い帯の外に出たのは <b>23.3％</b>、広い帯の外に出たのは <b>6.7％</b> でした"));
-  assert.ok(container.innerHTML.includes("帯の作り：狭い帯は約3回に1回（約32％）、広い帯は約20回に1回（約5％）外に出る想定で作っています"));
+  assert.ok(container.innerHTML.includes("過去 <b>30</b> 回のうち、約1か月後の値が狭い帯（よくある幅）の外に出たのは <b>23.3％</b>、広い帯（まれな幅）の外に出たのは <b>6.7％</b> でした"));
+  assert.ok(container.innerHTML.includes("帯の作り：狭い帯（よくある幅）は約3回に1回（約32％）、広い帯（まれな幅）は約20回に1回（約5％）外に出る想定で作っています"));
 });
 
 test("値が毎日同じなら外に出た割合は 0.0％（NaN にならない）。日が無いときは「答え合わせができません」", function () {

@@ -2,7 +2,7 @@
 
 上限：最初の表示で読むもの 80KB 以下・10個以下／ページ全体（後から読む分を含む）200KB 以下（どれも圧縮前）。
 最初の表示で読むもの：index.html と、その中の <link>・<script> のファイル、band_config.js で選んだ方法のファイル1つ。
-後から読むもの：js/data_loader.js の LATER_FILES の一覧。
+後から読むもの：js/data_loader.js の LATER_FILES（過去の分・くわしくの表示など）・STORY_FILES（今日の図）・RESULT_FILES（結果カード）の一覧。
 主な関数：list_initial_files・list_later_files・check_sizes。使い方：python tools/check_size.py（超えたら終了コード1）
 """
 
@@ -37,10 +37,12 @@ def list_initial_files():
 
 
 def list_later_files():
-    """最初の表示のあとに読むファイルの一覧を返す（data_loader.js の LATER_FILES）。"""
-    loader = read_text("js/data_loader.js")
-    block = re.search(r"const LATER_FILES = \[(.*?)\];", loader, re.S).group(1)
-    return re.findall(r'"([^"]+)"', block)
+    """最初の表示のあとに読むファイルの一覧を返す（data_loader.js の LATER_FILES・STORY_FILES・RESULT_FILES）。"""
+    files = []
+    for relative_path, list_name in (("js/data_loader.js", "LATER_FILES"), ("js/data_loader.js", "STORY_FILES"), ("js/data_loader.js", "RESULT_FILES")):
+        block = re.search(r"const " + list_name + r" = \[(.*?)\];", read_text(relative_path), re.S).group(1)
+        files += re.findall(r'"([^"]+)"', block)
+    return files
 
 
 def total_bytes(files):

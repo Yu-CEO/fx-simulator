@@ -14,6 +14,7 @@ const PRODUCT_DIR = path.join(__dirname, "..");
 const BANNED_WORDS = [
   "買い", "売り", "エントリー", "チャンス", "狙い目",
   "おすすめ", "上がりそう", "下がりそう", "予想",
+  "最悪", "最高", "当たった", "外れた",  // 最悪・最高・当たった・外れた（v4：今日の図・縦動画。仕様 2-6）
 ];
 const LIMITED_WORD = "予測";  // 決まった否定の文の中でだけ使ってよい言葉
 const ALLOWED_PHRASES = ["予測ではありません", "予測・保証するものではなく"];
@@ -21,7 +22,7 @@ const ALLOWED_PHRASES = ["予測ではありません", "予測・保証する�
 /** 調べるファイル（画面・README・コード）。tests と docs（仕様書など）は除く */
 function listCheckedFiles() {
   const files = ["index.html", "README.md", "css/style.css"];
-  for (const folder of ["js", "js/band_methods", "tools", ".github/workflows"]) {
+  for (const folder of ["js", "js/band_methods", "tools", "tools/video", ".github/workflows"]) {
     const full = path.join(PRODUCT_DIR, folder);
     if (!fs.existsSync(full)) {
       continue;
@@ -53,12 +54,17 @@ test("AC-12：上部・下部の注意書き、帯のそばと似た局面の常
   const required = [
     "為替がどれくらいの幅で動くものかを、過去のデータで学ぶためのツールです。売買のタイミングや方向を示すものではありません。",
     "このツールは、過去の為替データを決まった計算式で集計・表示するだけのものです。将来の値動きを予測・保証するものではなく、特定の商品・取引・業者をすすめるものでもありません。FX（外国為替証拠金取引）は元本を超える損失が出ることがあります。実際の判断はご自身の責任で行ってください。",
-    "過去の事実を数えただけです。重なった期間も別々に数えています。この先が同じになるとは限りません。",
     "）から作った幅です。予測ではありません。",
   ];
   for (const sentence of required) {
     assert.ok(html.includes(sentence), sentence);
   }
+  // 画面の中身を JavaScript が入れる所の常に出す文（仕様 2-2・2-4）
+  const more = fs.readFileSync(path.join(PRODUCT_DIR, "js", "more_view.js"), "utf8");
+  assert.ok(more.includes("過去の事実を数えただけです。重なった期間も別々に数えています。この先が同じになるとは限りません。"));
+  assert.ok(more.includes("過去の動きの大きさから作った幅です。予測ではありません。"));
+  const result = fs.readFileSync(path.join(PRODUCT_DIR, "js", "result_view.js"), "utf8");
+  assert.ok(result.includes("過去の動きの大きさから作った幅です。予測ではありません。売買の判断には使えません。"));
 });
 
 test("AC-31：帯のそばの文の「計算方法：○○」は、採用した方法の短い名前（main.js が band_config.js から入れる）", function () {
@@ -73,7 +79,7 @@ test("AC-11：ページ下部に出典・データの性質・当サイトで計
   assert.ok(html.includes("為替データ：欧州中央銀行（ECB）の参照レート（<a href=\"https://frankfurter.dev/\""));
   assert.ok(!html.includes("集約"));
   assert.ok(html.includes("欧州中央銀行が1日1回公表する参照レートです。米ドル／円は、ユーロ基準の値から Frankfurter が計算し、当サイトで小数第3位に丸めたものです。リアルタイムの値ではありません。土日と欧州中央銀行の休業日の値はありません。データの正確さは保証されません。"));
-  assert.ok(html.includes("帯・答え合わせ・似た局面の数字は、上のデータをもとに当サイトで計算したものです。"));
+  assert.ok(html.includes("帯・答え合わせ・似た局面・今日の図の数字は、上のデータをもとに当サイトで計算したものです。"));
   assert.ok(html.includes('id="last-date"'));
 });
 

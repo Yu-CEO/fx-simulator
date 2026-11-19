@@ -1,0 +1,55 @@
+# 縦動画の自動生成：毎朝のデータ取得が成功し、データの最終日が変わった日に、TikTok 用の縦動画（1080×1920・無音の mp4）を1本作る
+# ・呼び出し元は update_data.yml（取得が成功して最終日が変わったときだけ呼ぶ）。手で動かす（workflow_dispatch）こともできる
+# ・動画は Actions の成果物（artifact）として保存するだけ。commit・push はしない（動画を git の履歴に入れない）。保存期間は下の VIDEO_RETENTION_DAYS（日）
+# ・TikTok への投稿は作者が手で行う（自動投稿はしない）。Actions の画面から動画を取り出す
+# ・1か月前の帯が作れない日は、動画を作らず、理由をログに出して成功で終わる
+# ・使う道具（Actions の中だけ）：Playwright（Chromium を自動で動かす）・ffmpeg・日本語フォント Noto Sans CJK。利用条件は README の「縦動画の道具」
+name: 縦動画の自動生成
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  # 成果物の保存期間（日）。変えるときはここだけ
+  VIDEO_RETENTION_DAYS: 7
+
+jobs:
+  video:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read      # 読むだけ（書き込みの権限は持たない）
+    steps:
+      # 取得のあとに push された最新のデータを使う
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: 道具を入れる（ffmpeg・日本語フォント）
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+
+      - name: 道具を入れる（Playwright と Chromium）
+        run: |
+          pip install -r tools/video/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: 動画を作る
+        id: make
+        run: python tools/video/make_video.py
+
+      - name: 動画を成果物に保存する
+        if: steps.make.outputs.make == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fx_daily_${{ steps.make.outputs.last_date }}
+          path: video_output/fx_daily_*.mp4
+          retention-days: ${{ env.VIDEO_RETENTION_DAYS }}
+          if-no-files-found: error

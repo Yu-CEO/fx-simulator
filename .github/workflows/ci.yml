@@ -1,8 +1,9 @@
 # CI/CD（自動チェックと自動公開）の設定：fx-simulator（ブラウザで動くソフト＋Pythonの取得ツール）
 # GitHubにコードを上げるたびと、データの自動取得が終わったときに、次を自動で実行する。
 #   1. テスト（node --test と python unittest。本物の API には問い合わせない）
-#   2. 読む量の確認（tools/check_size.py。仕様 2-7 の上限を超えたら失敗）
+#   2. 読む量の確認（tools/check_size.py。index.html と js/data_loader.js の LATER_FILES・STORY_FILES・RESULT_FILES の一覧を数え、仕様 2-7 の上限を超えたら失敗）
 #   3. 機密チェック（ci/confidential_check.py）
+#   3b. 動画ファイルが git の履歴に入っていないことの確認（tools/check_no_video.py）
 #   4. 1〜3が合格し、Web公開がオンのときだけ、GitHub Pages に公開する
 # データの自動取得（update_data.yml）が push したときは、GitHub の決まりでこの CI が動かないため、
 #   workflow_run（別の自動実行が終わったら動く仕組み）でつなぐ。
@@ -30,7 +31,10 @@ jobs:
     permissions:
       contents: read
     steps:
+      # 履歴を全部取ってくる（動画ファイルが履歴に入っていないかを調べるため）
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:
@@ -47,6 +51,9 @@ jobs:
 
       - name: 読む量の確認
         run: python tools/check_size.py
+
+      - name: 動画ファイルが入っていないかの確認
+        run: python tools/check_no_video.py --history
 
       - name: 機密チェック
         env:

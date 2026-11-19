@@ -33,14 +33,14 @@ test("AC-24：画面用データの値は小数第3位まで（それより長�
   }
 });
 
-test("AC-10a：recent と older に同じ日付が重ならず、つなぐと古い順。最近の分は約1年＋20営業日（270件）", function () {
+test("AC-10a：recent と older に同じ日付が重ならず、つなぐと古い順。最近の分は271件以上（AC-40a）", function () {
   const data = loadDataFiles();
   const all = combineData(data.FX_DATA_RECENT, data.FX_DATA_OLDER);
   assert.strictEqual(all.dates.length, all.values.length);
   for (let index = 1; index < all.dates.length; index++) {
     assert.ok(all.dates[index] > all.dates[index - 1], "古い順・重なりなし");
   }
-  assert.ok(data.FX_DATA_RECENT.values.length <= 270);
+  assert.ok(data.FX_DATA_RECENT.values.length >= 271);
   assert.strictEqual(String(data.FX_DATA_RECENT.dates[data.FX_DATA_RECENT.dates.length - 1]), data.FX_DATA_RECENT.lastDate.replace(/-/g, ""));
 });
 

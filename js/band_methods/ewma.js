@@ -6,7 +6,7 @@
  * 式：σ²(今日)＝λ×σ²(前日)＋(1−λ)×変化(前日)²、S(h)＝σ×√h。変化の平均（向き）は使わない。
  */
 
-// 設定（band_config.js）。ブラウザでは先に読み込まれた BAND_CONFIG を、Node.js では require で読む
+// ブラウザでは先に読んだ名前を、Node.js では require で読む
 const EWMA_SETTINGS = (typeof module !== "undefined" && module.exports) ? require("../band_config.js") : BAND_CONFIG;
 // 使う変化の数。250営業日＝約1年。①と同じ日数にして、答え合わせの日の集まりをそろえる
 const EWMA_WINDOW = EWMA_SETTINGS.windowDays;
@@ -18,27 +18,26 @@ const EWMA_LAMBDA = EWMA_SETTINGS.ewmaLambda;
  * 最初の分散は、その250個の変化の2乗の平均から始める（どこから始めても、0.94 の重みで約1か月たつと影響は小さくなる）。
  * @param {number[]} changes ある日までの日々の変化（対数）。古い順
  * @param {object} [options] { lambda } λ を替えて試すとき（省略時は band_config.js の値）
- * @returns {number|null} σ。変化が足りないときは null
- * @example ewmaDaily(changes) // 約 0.005
+ * @returns {number|null} 翌日の1日の動きの大きさ σ。変化が足りないとき null
  */
 function ewmaDaily(changes, options) {
-  if (changes.length < EWMA_WINDOW) {
-    return null;
-  }
-  let lambda = EWMA_LAMBDA;
-  if (options && typeof options.lambda === "number") {
-    lambda = options.lambda;
-  }
-  const recent = changes.slice(changes.length - EWMA_WINDOW);
-  let squaredSum = 0;
-  for (const change of recent) {
-    squaredSum += change * change;
-  }
-  let variance = squaredSum / EWMA_WINDOW;
-  for (const change of recent) {
-    variance = lambda * variance + (1 - lambda) * change * change;
-  }
-  return Math.sqrt(variance);
+	if (changes.length < EWMA_WINDOW) {
+		return null;
+	}
+	let lambda = EWMA_LAMBDA;
+	if (options && typeof options.lambda === "number") {
+		lambda = options.lambda;
+	}
+	const recent = changes.slice(changes.length - EWMA_WINDOW);
+	let squaredSum = 0;
+	for (const change of recent) {
+		squaredSum += change * change;
+	}
+	let variance = squaredSum / EWMA_WINDOW;
+	for (const change of recent) {
+		variance = lambda * variance + (1 - lambda) * change * change;
+	}
+	return Math.sqrt(variance);
 }
 
 /**
@@ -46,21 +45,21 @@ function ewmaDaily(changes, options) {
  * @param {number[]} changes ある日までの日々の変化（対数）。その日より後の変化は入れない
  * @param {number} horizonDays 先の長さ（営業日）
  * @param {object} [options] { lambda }
- * @returns {number|null} S(h)。変化が足りないときは null
+ * @returns {number|null} S(h)。変化が足りないとき null（画面の「データが足りない」につながる）
  */
 function ewmaScale(changes, horizonDays, options) {
-  const dailySigma = ewmaDaily(changes, options);
-  if (dailySigma === null) {
-    return null;
-  }
-  return dailySigma * Math.sqrt(horizonDays);
+	const dailySigma = ewmaDaily(changes, options);
+	if (dailySigma === null) {
+		return null;
+	}
+	return dailySigma * Math.sqrt(horizonDays);
 }
 
 const ewmaMethod = { name: "ewma", computeScale: ewmaScale, dailySigma: ewmaDaily };
 
 // Node.js では require で使えるようにする。ブラウザでは「読み込んだ方法」として決まった名前に入れる
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = ewmaMethod;
+	module.exports = ewmaMethod;
 } else {
-  window.loadedBandMethod = ewmaMethod;
+	window.loadedBandMethod = ewmaMethod;
 }

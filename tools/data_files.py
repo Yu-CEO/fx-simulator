@@ -19,8 +19,14 @@ SOURCE_COMMENT_LINES = [
 CSV_HEADER = "date,value"
 # 画面用データの値の桁。0.001円（小数第3位）。ファイルを小さくするため（仕様 2-7）
 SCREEN_DECIMAL = Decimal("0.001")
-# 最初に読む分の件数。約1年（250営業日）＋先の最長（20営業日）＝270件。最初の画面のチャートと帯、今日の図の1か月前の帯に必要な分
-RECENT_COUNT = 270
+# 最初に読む分の件数。今日の図の「1か月前の帯」には 251件（その日まで）＋20件＝271件が要る（仕様 2-8・AC-40a）。
+# 1件足りないと今日の図が毎日出なくなるため、余裕を持たせて 280件にする（期間ではなく件数で切る）
+RECENT_COUNT = 280
+# これを下回ってはいけない件数（271件）。テストと、画面用データを作るときの確認に使う
+RECENT_MIN_COUNT = 271
+# 画面用データ全体（最近の分＋それより前の分）の件数の上限。約10年分（約255営業日×10年）。仕様 2-1「過去約10年分」。
+# 毎朝の更新で古い日から切り落とし、画面が読む量（仕様 2-7 の 200KB）が日々増え続けないようにする。元の CSV には全部残す
+SCREEN_MAX_COUNT = 2560
 # 土曜・日曜（datetime の weekday で 5・6）。ECB の値に週末はないが、万一入ってきても営業日だけで数えるための保険
 # （画面用には平日の値だけを使う。元の CSV には残す）
 WEEKEND_DAYS = (5, 6)
@@ -104,6 +110,9 @@ def build_screen_data(rows):
             weekend_count += 1
             continue
         valid.append((row["date"].replace("-", ""), screen_value))
+    # 古い方から上限を超えた分を切り落とす（画面用だけ。CSV は変えない）
+    valid = valid[-SCREEN_MAX_COUNT:]
+    # 元のデータが十分あるのに最近の分が少ないと今日の図が出なくなる。件数で切るので RECENT_MIN_COUNT 以上になる
     split_at = max(0, len(valid) - RECENT_COUNT)
     return valid[split_at:], valid[:split_at], skipped_count, weekend_count
 
@@ -115,9 +124,8 @@ def build_screen_js(variable_name, pairs, last_date):
     返すもの：JavaScript の文字
     """
     header = (
-        "/* 自動生成：tools/update_data.py が data/usdjpy_source.csv から作るファイル。手で書き換えない。\n"
-        " * 出どころ：欧州中央銀行（ECB）の参照レート（Frankfurter 経由）。米ドル／円。\n"
-        " * dates は日付（YYYYMMDD の数字）、values は円（小数第3位まで）。 */\n"
+        "/* 自動生成（tools/update_data.py。手で書き換えない）。出どころ：欧州中央銀行（ECB）の参照レート（Frankfurter 経由）米ドル／円。"
+        "dates＝YYYYMMDD、values＝円（小数第3位） */\n"
     )
     # 数字は JSON の形でそのまま並べる（JavaScript でもそのまま読める）
     dates_text = ",".join(date for date, _ in pairs)

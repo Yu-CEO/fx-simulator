@@ -1,5 +1,5 @@
 /*
- * band_calc.test.js：js/band_calc.js（帯の作り方・仕様 2-2）と帯の数字の表示の自動テスト
+ * band_calc.test.js：js/band_calc.js（帯の作り方・仕様 2-2・旅行代の計算）と答えの箱の数字の自動テスト
  * 受け入れ基準 AC-4・AC-5・AC-6・AC-25・AC-26 に対応。作ったデータ（仮の数字）だけを使う。
  */
 const test = require("node:test");
@@ -8,7 +8,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const BAND_CONFIG = require("../js/band_config.js");
 const { computeDailyChanges, buildBand } = require("../js/band_calc.js");
-const { renderBandNumbers } = require("../js/band_view.js");
+const { buildAnswerHtml, renderAnswer } = require("../js/answer_view.js");
 const { randomWalkValues, flatValues, fakeContainer } = require("./helpers.js");
 
 const PRODUCT_DIR = path.join(__dirname, "..");
@@ -20,11 +20,10 @@ const rollingStd = require("../js/band_methods/rolling_std.js");
 test("AC-4：値が毎日同じ（100が300日）なら σ＝0、帯の数字は 100.00円〜100.00円。NaN は出ない", function () {
   const band = buildBand(flatValues(300, 100), rollingStd, 20);
   assert.strictEqual(rollingStd.dailySigma(computeDailyChanges(flatValues(300, 100))), 0);
-  const container = fakeContainer();
-  renderBandNumbers(container, band, "約1か月");
-  assert.match(container.innerHTML, /約1か月後の幅（狭い帯）<\/dt><dd>100\.00円〜100\.00円/);
-  assert.match(container.innerHTML, /約1か月後の幅（広い帯）<\/dt><dd>100\.00円〜100\.00円/);
-  assert.ok(!container.innerHTML.includes("NaN"));
+  const html = buildAnswerHtml(band);
+  assert.ok(html.includes("100.00〜100.00<small>円</small>"));
+  assert.ok(html.includes("まれな幅（20回に19回くらいはこの中）：<span class=\"num\">100.00〜100.00円</span>"));
+  assert.ok(!html.includes("NaN"));
 });
 
 test("AC-5：方法①で変化が +a・−a の交互なら σ は式どおり、狭い帯の上端＝最終日の値×exp(σ×√20)", function () {
@@ -41,12 +40,12 @@ test("AC-5：方法①で変化が +a・−a の交互なら σ は式どおり�
   assert.strictEqual(band.narrow.upper.toFixed(2), (last * Math.exp(expectedSigma * Math.sqrt(20))).toFixed(2));
 });
 
-test("AC-6：データが250件以下なら帯を作らず、決まった文を出す", function () {
+test("AC-6：データが250件以下なら帯を作らず、決まった文を出す（約1年分のデータが必要です）", function () {
   const band = buildBand(randomWalkValues(250, 0.005, 1), rollingStd, 20);
   assert.strictEqual(band.enough, false);
   const container = fakeContainer();
-  renderBandNumbers(container, band, "約1か月");
-  assert.ok(container.innerHTML.includes("データが足りないため幅を作れません（250営業日分以上が必要です）"));
+  renderAnswer(container, band);
+  assert.ok(container.innerHTML.includes("データが足りないため、幅を作れません（約1年分のデータが必要です）。"));
   assert.strictEqual(buildBand(randomWalkValues(251, 0.005, 1), rollingStd, 20).enough, true);
 });
 
